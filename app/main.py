@@ -4,21 +4,50 @@ import json
 import os
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
 from .bootstrap import (
     ensure_default_profile,
+    ensure_learning_foundation,
     ensure_model_provider,
     ensure_prompt_templates,
     get_template_by_slug,
     get_templates,
 )
 from .db import engine, get_session, init_db
+from .learning import (
+    add_evidence_source,
+    build_syllabus_version,
+    create_daily_plan,
+    decide_next_topic,
+    grouped_syllabus,
+    loads_list,
+    progress_to_dict,
+    recommendation_history_to_dict,
+    recommendation_to_dict,
+    record_feedback,
+    seed_syllabus,
+    syllabus_to_dict,
+    syllabus_to_markdown,
+    update_mastery,
+)
 from .llm import estimate_cost_usd, estimate_tokens, get_llm_config, stream_chat_completion
-from .models import CostRecord, LearningSession, PromptRun, UserProfile, utcnow
+from .models import (
+    CostRecord,
+    EvidenceSource,
+    LearningRoadmap,
+    LearningSession,
+    MasteryRecord,
+    PromptRun,
+    RecommendationRun,
+    SyllabusItem,
+    TopicFeedback,
+    UserProfile,
+    utcnow,
+)
 from .prompt_builder import build_prompt
 
 APP_TITLE = os.getenv("APP_TITLE", "Prompt Learning OS")
@@ -35,6 +64,7 @@ def on_startup() -> None:
         ensure_default_profile(session)
         ensure_prompt_templates(session)
         ensure_model_provider(session, get_llm_config())
+        ensure_learning_foundation(session)
 
 
 def get_profile(session: Session) -> UserProfile:
@@ -44,10 +74,27 @@ def get_profile(session: Session) -> UserProfile:
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, session: Session = Depends(get_session)):
     profile = get_profile(session)
+    roadmap = seed_syllabus(session, profile, reason="index")
     templates_list = get_templates(session)
     runs = session.exec(
         select(PromptRun).order_by(PromptRun.created_at.desc()).limit(12)
     ).all()
+    latest_recommendation = session.exec(
+        select(RecommendationRun).order_by(RecommendationRun.created_at.desc())
+    ).first()
+    deferred_items = session.exec(
+        select(SyllabusItem).where(SyllabusItem.status == "deferred").order_by(SyllabusItem.title)
+    ).all()
+    skipped_items = session.exec(
+        select(SyllabusItem).where(SyllabusItem.status == "skip_for_now").order_by(SyllabusItem.title)
+    ).all()
+    evidence_sources = session.exec(
+        select(EvidenceSource).order_by(EvidenceSource.captured_at.desc()).limit(6)
+    ).all()
+    feedback_count = len(session.exec(select(TopicFeedback)).all())
+    mastery_count = len(
+        session.exec(select(MasteryRecord).where(MasteryRecord.confidence >= 0.8)).all()
+    )
     cost_records = session.exec(select(CostRecord)).all()
     total_cost = sum(record.estimated_cost_usd for record in cost_records)
     total_input_tokens = sum(record.input_tokens for record in cost_records)
@@ -58,6 +105,24 @@ def index(request: Request, session: Session = Depends(get_session)):
         name="index.html",
         context={
             "profile": profile,
+            "roadmap": roadmap,
+            "syllabus_groups": grouped_syllabus(session, roadmap.id),
+            "latest_recommendation": latest_recommendation,
+            "latest_recommendation_steps": loads_list(
+                latest_recommendation.suggested_next_steps_json
+            )
+            if latest_recommendation
+            else [],
+            "latest_recommendation_alternatives": loads_list(
+                latest_recommendation.alternatives_json
+            )
+            if latest_recommendation
+            else [],
+            "deferred_items": deferred_items,
+            "skipped_items": skipped_items,
+            "evidence_sources": evidence_sources,
+            "feedback_count": feedback_count,
+            "mastery_count": mastery_count,
             "prompt_templates": templates_list,
             "runs": runs,
             "llm_config": llm_config,
@@ -167,6 +232,166 @@ def generate_prompt(
             "llm_enabled": get_llm_config().enabled,
         },
     )
+
+
+@app.post("/recommendations/next", response_class=HTMLResponse)
+def recommend_next(request: Request, session: Session = Depends(get_session)):
+    profile = get_profile(session)
+    run = decide_next_topic(session, profile)
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/recommendation_result.html",
+        context={
+            "recommendation": run,
+            "suggested_steps": loads_list(run.suggested_next_steps_json),
+            "alternatives": loads_list(run.alternatives_json),
+        },
+    )
+
+
+@app.post("/syllabus/generate", response_class=HTMLResponse)
+def generate_syllabus(
+    request: Request,
+    reason: str = Form("manual update"),
+    session: Session = Depends(get_session),
+):
+    profile = get_profile(session)
+    roadmap = seed_syllabus(session, profile, reason=reason)
+    version = build_syllabus_version(session, profile, reason=reason)
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/syllabus.html",
+        context={
+            "roadmap": roadmap,
+            "roadmap_version": version,
+            "syllabus_groups": grouped_syllabus(session, roadmap.id),
+        },
+    )
+
+
+@app.post("/daily-plan", response_class=HTMLResponse)
+def daily_plan(
+    request: Request,
+    time_budget: str = Form("30 minutes"),
+    session: Session = Depends(get_session),
+):
+    profile = get_profile(session)
+    plan = create_daily_plan(session, profile, time_budget=time_budget)
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/daily_plan.html",
+        context={"daily_plan": plan},
+    )
+
+
+@app.post("/evidence", response_class=HTMLResponse)
+def add_evidence(
+    request: Request,
+    source_title: str = Form(...),
+    related_topic: str = Form(...),
+    source_type: str = Form("user_note"),
+    freshness_level: str = Form("unknown"),
+    summary: str = Form(""),
+    url: str = Form(""),
+    manual_note: str = Form(""),
+    reliability_score: float = Form(0.7),
+    session: Session = Depends(get_session),
+):
+    source = add_evidence_source(
+        session,
+        source_title=source_title,
+        related_topic=related_topic,
+        source_type=source_type,
+        freshness_level=freshness_level,
+        summary=summary,
+        url=url,
+        manual_note=manual_note,
+        reliability_score=reliability_score,
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/evidence_saved.html",
+        context={"source": source},
+    )
+
+
+@app.post("/feedback", response_class=HTMLResponse)
+def submit_feedback(
+    request: Request,
+    topic_title: str = Form(...),
+    action: str = Form(...),
+    syllabus_item_id: int | None = Form(None),
+    note: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    feedback = record_feedback(
+        session,
+        topic_title=topic_title,
+        action=action,
+        syllabus_item_id=syllabus_item_id,
+        note=note,
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/feedback_saved.html",
+        context={"feedback": feedback},
+    )
+
+
+@app.post("/mastery", response_class=HTMLResponse)
+def submit_mastery(
+    request: Request,
+    topic_title: str = Form(...),
+    can_explain: bool = Form(False),
+    can_build: bool = Form(False),
+    can_debug: bool = Form(False),
+    can_apply: bool = Form(False),
+    evidence_note: str = Form(""),
+    confidence: float = Form(0.5),
+    session: Session = Depends(get_session),
+):
+    try:
+        record = update_mastery(
+            session,
+            topic_title=topic_title,
+            can_explain=can_explain,
+            can_build=can_build,
+            can_debug=can_debug,
+            can_apply=can_apply,
+            evidence_note=evidence_note,
+            confidence=confidence,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/mastery_saved.html",
+        context={"mastery": record},
+    )
+
+
+@app.get("/exports/syllabus.json")
+def export_syllabus_json(session: Session = Depends(get_session)):
+    profile = get_profile(session)
+    roadmap = seed_syllabus(session, profile, reason="export")
+    return JSONResponse(syllabus_to_dict(session, roadmap))
+
+
+@app.get("/exports/syllabus.md", response_class=PlainTextResponse)
+def export_syllabus_markdown(session: Session = Depends(get_session)):
+    profile = get_profile(session)
+    roadmap = seed_syllabus(session, profile, reason="export")
+    return PlainTextResponse(syllabus_to_markdown(session, roadmap), media_type="text/markdown")
+
+
+@app.get("/exports/recommendations.json")
+def export_recommendations_json(session: Session = Depends(get_session)):
+    return JSONResponse({"recommendations": recommendation_history_to_dict(session)})
+
+
+@app.get("/exports/progress.json")
+def export_progress_json(session: Session = Depends(get_session)):
+    return JSONResponse(progress_to_dict(session))
 
 
 @app.get("/runs/{run_id}", response_class=HTMLResponse)

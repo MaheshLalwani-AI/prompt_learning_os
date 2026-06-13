@@ -1,0 +1,25 @@
+<div class="result-card">
+  <h3>Today</h3>
+  <p class="muted">Time budget: {{ daily_plan.time_budget }}</p>
+
+  <div class="daily-grid">
+    <div>
+      <span class="label">Primary study</span>
+      <strong>{{ daily_plan.primary.title }}</strong>
+      <p class="muted">{{ daily_plan.primary.subtopic }}</p>
+      <p>{{ daily_plan.primary.why }}</p>
+    </div>
+    <div>
+      <span class="label">Practice</span>
+      <strong>{{ daily_plan.practice.title }}</strong>
+      <p class="muted">{{ daily_plan.practice.subtopic }}</p>
+      <p>{{ daily_plan.practice.why }}</p>
+    </div>
+    <div>
+      <span class="label">Optional review</span>
+      <strong>{{ daily_plan.review.title }}</strong>
+      <p class="muted">{{ daily_plan.review.subtopic }}</p>
+      <p>{{ daily_plan.review.why }}</p>
+    </div>
+  </div>
+</div>

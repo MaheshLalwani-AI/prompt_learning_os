@@ -1,0 +1,78 @@
+<div class="section-head">
+  <div>
+    <h2>Full syllabus</h2>
+    <p class="muted">
+      {{ roadmap.title }} · version {{ roadmap.current_version }}
+      {% if roadmap_version %}· {{ roadmap_version.summary }}{% endif %}
+    </p>
+  </div>
+  <div class="actions">
+    <a class="button-link" href="/exports/syllabus.json">JSON</a>
+    <a class="button-link" href="/exports/syllabus.md">Markdown</a>
+  </div>
+</div>
+
+{% for group in syllabus_groups %}
+  <section class="syllabus-module">
+    <h3>{{ group.module.title }}</h3>
+    <p class="muted">{{ group.module.summary }}</p>
+
+    <div class="syllabus-items">
+      {% for item in group.items %}
+        <article class="syllabus-item">
+          <div class="section-head">
+            <div>
+              <strong>{{ item.title }}</strong>
+              <p class="muted">{{ item.subtopic }}</p>
+            </div>
+            <span class="badge">{{ item.status }}</span>
+          </div>
+
+          <div class="meta-line">
+            <span>{{ item.category }}</span>
+            <span>{{ item.freshness_level }}</span>
+            <span>confidence {{ "%.0f"|format(item.confidence * 100) }}%</span>
+            <span>ROI {{ item.roi_score }}</span>
+            <span>effort {{ item.effort_score }}</span>
+            <span>urgency {{ item.urgency_score }}</span>
+          </div>
+
+          <p>{{ item.why_this_now }}</p>
+          <p class="muted">Freshness: {{ item.freshness_note }}</p>
+          <p class="muted">Source: {{ item.source_basis }}</p>
+
+          <div class="actions">
+            {% for action in ["interested", "learned", "too_early", "not_useful", "defer", "skip", "already_know"] %}
+              <form hx-post="/feedback" hx-target="#feedback-status" hx-swap="innerHTML">
+                <input type="hidden" name="syllabus_item_id" value="{{ item.id }}">
+                <input type="hidden" name="topic_title" value="{{ item.title }}">
+                <input type="hidden" name="action" value="{{ action }}">
+                <button type="submit">{{ action.replace("_", " ") }}</button>
+              </form>
+            {% endfor %}
+          </div>
+
+          <details class="mastery-box">
+            <summary>Record mastery evidence</summary>
+            <form hx-post="/mastery" hx-target="#feedback-status" hx-swap="innerHTML" class="form">
+              <input type="hidden" name="topic_title" value="{{ item.title }}">
+              <div class="checks">
+                <label><input type="checkbox" name="can_explain" value="true"> Can explain</label>
+                <label><input type="checkbox" name="can_build" value="true"> Can build</label>
+                <label><input type="checkbox" name="can_debug" value="true"> Can debug</label>
+                <label><input type="checkbox" name="can_apply" value="true"> Can apply</label>
+              </div>
+              <label>Evidence note
+                <input type="text" name="evidence_note" placeholder="What proves this?">
+              </label>
+              <label>Confidence
+                <input type="number" name="confidence" min="0" max="1" step="0.1" value="0.8">
+              </label>
+              <button type="submit">Save mastery</button>
+            </form>
+          </details>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+{% endfor %}

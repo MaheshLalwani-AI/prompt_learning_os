@@ -1,333 +1,172 @@
-# README.md
+# Prompt Learning OS
 
-# AI Learning OS
+Prompt Learning OS is a local-first FastAPI app for deciding what to learn next, maintaining a personalized AI automation syllabus, and turning that plan into prompt-driven learning sessions.
 
-AI Learning OS is a personalized learning operating system designed to maximize career progress, income potential, and long-term adaptability rather than simply delivering educational content.
+The app is intentionally small: Python backend, SQLite via SQLModel, HTMX/Jinja templates, and Server-Sent Events for streaming model responses.
 
-The system continuously determines:
+## What It Does
 
-* What to learn
-* Whether it is worth learning
-* When to learn it
-* How deeply to learn it
-* How it contributes to career and income goals
+- Builds optimized learning prompts from your profile.
+- Decides the next best topic and subtopic to study.
+- Maintains a full grouped syllabus with roadmap versions.
+- Tracks source evidence, freshness, confidence, and reasons for recommendations.
+- Accepts feedback such as `too early`, `skip`, `defer`, `interested`, and `already know`.
+- Tracks mastery evidence separately from passive reading.
+- Produces a compact daily plan.
+- Exports syllabus, recommendation history, and progress as JSON or Markdown.
 
-Unlike traditional LMS platforms, AI Learning OS optimizes for outcomes rather than content consumption.
+## How Next-Topic Selection Works
 
----
+The recommendation engine is deterministic and testable before any runtime LLM is connected. It scores syllabus items using:
 
-# Vision
+- learner goal and current profile
+- missing prerequisites
+- syllabus priority
+- ROI, effort, and urgency
+- stable-core vs adaptive-current vs experimental category
+- source evidence and freshness level
+- feedback and mastery records
 
-Become the operating system for continuous professional learning.
+It returns:
 
-The platform should continuously guide users toward:
+- `next_topic`
+- `next_subtopic`
+- `decision`: `learn_now`, `defer`, or `skip`
+- missing prerequisites
+- ROI, effort, urgency, and confidence
+- alternatives
+- recommended depth
+- source basis and freshness note
+- suggested next steps
 
-* Higher-paying opportunities
-* Faster career transitions
-* Stronger portfolios
-* More valuable skills
-* Better automation leverage
+## Full Syllabus
 
-while minimizing unnecessary learning effort.
+The syllabus is a structured curriculum map, not a flat list. It is grouped into modules such as:
 
----
+- Automation Foundations
+- AI Workflow Core
+- Automation Tools and Orchestration
+- Advanced and Deferred Topics
 
-# Core Philosophy
+Each item includes:
 
-Every recommendation is evaluated using:
+- status: `learn_next`, `recommended_soon`, `later`, `deferred`, `skip_for_now`, `mastered`
+- category: `stable_core`, `adaptive_current`, `experimental`, `skip_for_now`
+- prerequisites
+- ROI, effort, urgency, and confidence
+- source basis
+- freshness note and freshness level
+- reason for inclusion
 
-(Expected Career Return + Expected Income Return + Expected Longevity + Expected Automation Leverage)
+Every syllabus update creates a roadmap version.
 
-÷
+## Evidence And Freshness
 
-(Learning Time + Maintenance Cost + Complexity)
+Recommendations should not pretend to be current without evidence. Evidence sources can be added from the UI with:
 
-The platform prioritizes the highest-return learning opportunities available at any moment.
+- source title
+- URL or manual note
+- source type
+- related topic
+- freshness level
+- summary
+- reliability score
 
----
+Freshness levels:
 
-# Target Users
+- `verified_current`: current evidence is available
+- `probably_stable`: stable foundational topic
+- `needs_checking`: likely useful but should be checked against current sources
+- `stale_risk`: may be outdated
+- `unknown`: no current evidence
 
-Primary:
+Unknown or stale freshness caps confidence. Date-sensitive topics need evidence before they can receive high confidence.
 
-* Career transitioners
-* AI Automation Engineers
-* Freelancers
-* Consultants
-* Product builders
-* Self-taught developers
+## Feedback Loop
 
-Secondary:
+Feedback changes future recommendations:
 
-* Software engineers
-* Technical educators
-* Operations professionals
-* Knowledge workers
+- `interested`: raises priority slightly
+- `too_early`: signals missing prerequisites
+- `not_useful`: lowers priority
+- `defer`: moves an item to deferred
+- `skip`: moves an item to skip-for-now
+- `already_know`: marks the item mastered
+- `learned`: records learning feedback but does not automatically mark mastery
 
----
+## Mastery Tracking
 
-# Core Modules
+The app does not mark a topic complete just because you viewed it. Mastery evidence tracks whether you can:
 
-## 1. Career Transition Engine
+- explain it
+- build with it
+- debug it
+- apply it
 
-Builds and continuously updates personalized career-transition roadmaps.
+An item becomes mastered when all mastery evidence is recorded or when you explicitly mark it `already_know`.
 
-Features:
+## Daily Plan
 
-* Career-transition roadmap builder
-* Goal-oriented curriculum generation
-* Skill-gap analysis
-* Roadmap versioning
-* Context-aware session planning
+The daily plan returns:
 
----
+- one primary study item
+- one practice item
+- one optional review item
 
-## 2. Learning Request Engine
+It uses the current recommendation, time budget, syllabus status, feedback, and mastery state.
 
-Allows users to request any learning topic at any time.
+## Runtime Model Selection
 
-Examples:
+Runtime model choice is external and configured through `.env`.
 
-* Learn Hermes
-* Learn MCP
-* Learn Docker
-* Learn FastAPI
-* Learn LangGraph
-* Learn Claude Code
-* Learn n8n
+Example:
 
-For every request the system determines:
+```env
+LLM_PROVIDER_NAME=Generic API
+LLM_BASE_URL=https://example.com/v1
+LLM_API_KEY=your_key_here
+LLM_MODEL=your_model
+LLM_TEMPERATURE=0.2
+LLM_INPUT_COST_PER_1M_TOKENS=0
+LLM_OUTPUT_COST_PER_1M_TOKENS=0
+```
 
-* Is it worth learning?
-* Is it worth learning now?
-* What are the prerequisites?
-* What is the ROI?
-* How does it fit into the roadmap?
-* What is the fastest learning path?
+The core recommendation and syllabus engine works without an LLM. A configured API is only needed for streaming model answers to generated prompts.
 
----
+## Exports
 
-## 3. ROI & Decision Engine
+Available export routes:
 
-The intelligence layer that determines learning priorities.
+- `/exports/syllabus.json`
+- `/exports/syllabus.md`
+- `/exports/recommendations.json`
+- `/exports/progress.json`
 
-Features:
+## Example Flow
 
-* Learning ROI scoring
-* Effort-to-return optimization
-* Opportunity-cost analysis
-* Long-term vs short-term balancing
-* Topic classification
-* Hype filtering
-* Emerging-topic monitoring
+1. Save profile: goal is “Become an AI Automation Engineer”.
+2. Add evidence for a current topic, such as provider API docs.
+3. Click “Decide next”.
+4. Review the next topic, confidence, source basis, and freshness note.
+5. Generate or update the full syllabus.
+6. Click “Plan today”.
+7. Generate a learning prompt for the selected topic.
+8. Record feedback or mastery evidence after studying.
 
-Topic classifications:
+## Run
 
-* Long-Term Core
-* Short-Term Opportunity
-* Experimental
-* Skip For Now
+```bash
+uvicorn app.main:app --reload
+```
 
----
+Open:
 
-## 4. Knowledge Graph & Memory System
+```text
+http://127.0.0.1:8000
+```
 
-Maintains a personalized understanding of the learner.
+## Test
 
-Features:
-
-* Knowledge graph
-* Dependency tracking
-* Prerequisite verification
-* Learning memory
-* Progress tracking
-* Knowledge reuse
-
----
-
-## 5. Learning Engine
-
-Responsible for delivering lessons and practice.
-
-Features:
-
-* MCQs
-* Fill-in-the-blank exercises
-* Code completion
-* Progressive hints
-* Teach-back mode
-* Socratic questioning
-* Guided projects
-* Timed assessments
-* Interactive lessons
-
----
-
-## 6. Skill Verification Engine
-
-Advancement is based on demonstrated competency rather than lesson completion.
-
-Measures:
-
-* Build ability
-* Modification ability
-* Explanation ability
-* Troubleshooting ability
-
-Features:
-
-* Competency verification
-* Practical challenge validation
-* Readiness gates
-
----
-
-## 7. Retention Engine
-
-Maximizes long-term retention.
-
-Features:
-
-* Spaced repetition
-* Knowledge decay tracking
-* Error analysis journal
-* Fast-forward validation
-* Cheat-sheet generation
-* Searchable glossary
-
----
-
-## 8. Freshness & Verification System
-
-Ensures content remains current.
-
-Features:
-
-* Live documentation monitoring
-* Deprecation tracking
-* Version awareness
-* Research digests
-* Change detection
-* Source verification
-
-Capabilities:
-
-* What changed since I learned this?
-* Is this still valid?
-
----
-
-## 9. Trust & Quality Layer
-
-Provides transparency and verification.
-
-Features:
-
-* Source citation
-* Confidence scoring
-* Uncertainty scoring
-* Contradiction detection
-* Live verification
-
----
-
-## 10. Career & Income Engine
-
-Connects learning to real-world outcomes.
-
-Features:
-
-* Job-market alignment
-* Career-readiness tracking
-* Income-readiness tracking
-* Opportunity discovery
-* Freelance alignment
-
-Maps every topic to:
-
-* Employment
-* Freelancing
-* Consulting
-* Product creation
-* Internal automation
-
----
-
-## 11. Automation Opportunity Engine
-
-Transforms user experience into opportunities.
-
-Features:
-
-* Automation opportunity finder
-* Industry opportunity discovery
-* Workflow analysis
-* SaaS opportunity generation
-
----
-
-## 12. Portfolio Engine
-
-Converts learning into visible proof of capability.
-
-Features:
-
-* Portfolio artifact generation
-* Case study generation
-* Resume bullet generation
-* Interview explanation generation
-* Project showcase builder
-
----
-
-## 13. Productivity Layer
-
-Provides learning support tools.
-
-Features:
-
-* Knowledge base
-* Notes
-* Search
-* Diagrams
-* Animations
-* Session planning
-* Daily streaks
-
----
-
-## 14. Workflow & Infrastructure Layer
-
-Integrates modern development workflows.
-
-Features:
-
-* Git-first workflow support
-* uv workflow support
-* MCP integration
-* Interactive UI components
-* External tool integrations
-
-Supported ecosystems:
-
-* GitHub
-* VS Code
-* OpenRouter
-* Gemini
-* Claude
-* n8n
-* LangGraph
-* MCP servers
-
----
-
-# Long-Term Goal
-
-The system should eventually become a personal learning strategist that continuously answers:
-
-* What should I learn?
-* What should I ignore?
-* What should I automate?
-* What can I build?
-* How can I earn from it?
-* What should I do next?
+```bash
+python3 -m unittest
+```

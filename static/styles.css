@@ -76,6 +76,10 @@ input, textarea, select {
   font: inherit;
 }
 
+input[type="checkbox"] {
+  width: auto;
+}
+
 textarea {
   resize: vertical;
 }
@@ -143,6 +147,68 @@ button, .button-link {
   background: rgba(255,255,255,0.02);
 }
 
+.result-card,
+.syllabus-item,
+.syllabus-module {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255,255,255,0.02);
+}
+
+.syllabus-module {
+  margin-top: 14px;
+}
+
+.syllabus-items {
+  display: grid;
+  gap: 12px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  color: var(--accent);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.compact-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.compact-list li {
+  margin-bottom: 6px;
+}
+
+.daily-grid,
+.checks {
+  display: grid;
+  gap: 10px;
+}
+
+.daily-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.checks {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mastery-box {
+  margin-top: 10px;
+}
+
+.mastery-box summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+
 .history-top {
   display: flex;
   justify-content: space-between;
@@ -197,6 +263,8 @@ button, .button-link {
 @media (max-width: 940px) {
   .grid { grid-template-columns: 1fr; }
   .status-grid { grid-template-columns: 1fr; }
+  .daily-grid { grid-template-columns: 1fr; }
+  .checks { grid-template-columns: 1fr; }
   .section-head { flex-direction: column; }
   .row { grid-template-columns: 1fr; }
 }

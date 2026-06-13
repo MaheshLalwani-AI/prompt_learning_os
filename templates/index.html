@@ -84,6 +84,167 @@
   </div>
 </section>
 
+<section class="grid">
+  <div class="card">
+    <div class="section-head">
+      <div>
+        <h2>Next learning decision</h2>
+        <p class="muted">Evidence-aware, deterministic scoring from your profile, syllabus, feedback, and mastery.</p>
+      </div>
+      <form hx-post="/recommendations/next" hx-target="#recommendation-result" hx-swap="innerHTML">
+        <button type="submit">Decide next</button>
+      </form>
+    </div>
+
+    <div id="recommendation-result">
+      {% if latest_recommendation %}
+        {% set recommendation = latest_recommendation %}
+        {% set suggested_steps = latest_recommendation_steps %}
+        {% set alternatives = latest_recommendation_alternatives %}
+        {% include "partials/recommendation_result.html" %}
+      {% else %}
+        <p class="muted">No recommendation run yet.</p>
+      {% endif %}
+    </div>
+    <div id="feedback-status" class="status"></div>
+  </div>
+
+  <div class="card">
+    <h2>Today plan</h2>
+    <form hx-post="/daily-plan" hx-target="#daily-plan-result" hx-swap="innerHTML" class="form">
+      <label>Time budget
+        <input type="text" name="time_budget" value="30 minutes">
+      </label>
+      <button type="submit">Plan today</button>
+    </form>
+    <div id="daily-plan-result" class="result-area"></div>
+  </div>
+</section>
+
+<section class="grid">
+  <div class="card">
+    <h2>Add evidence/source</h2>
+    <form hx-post="/evidence" hx-target="#evidence-status" hx-swap="innerHTML" class="form">
+      <label>Source title
+        <input type="text" name="source_title" placeholder="Official docs page, changelog, or your note">
+      </label>
+      <label>Related topic
+        <input type="text" name="related_topic" placeholder="LLM Provider APIs">
+      </label>
+      <div class="row">
+        <label>Source type
+          <select name="source_type">
+            <option value="official_docs">Official docs</option>
+            <option value="changelog">Changelog</option>
+            <option value="repo">Repository</option>
+            <option value="article">Article</option>
+            <option value="user_note">User note</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>Freshness
+          <select name="freshness_level">
+            <option value="verified_current">Verified current</option>
+            <option value="probably_stable">Probably stable</option>
+            <option value="needs_checking">Needs checking</option>
+            <option value="stale_risk">Stale risk</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </label>
+      </div>
+      <label>URL
+        <input type="url" name="url" placeholder="https://...">
+      </label>
+      <label>Summary
+        <textarea name="summary" rows="3" placeholder="What this source proves or updates"></textarea>
+      </label>
+      <button type="submit">Save evidence</button>
+    </form>
+    <div id="evidence-status" class="status"></div>
+  </div>
+
+  <div class="card">
+    <h2>Signals</h2>
+    <div class="status-grid">
+      <div>
+        <span class="label">Roadmap version</span>
+        <strong>{{ roadmap.current_version }}</strong>
+      </div>
+      <div>
+        <span class="label">Evidence sources</span>
+        <strong>{{ evidence_sources|length }}</strong>
+      </div>
+      <div>
+        <span class="label">Feedback events</span>
+        <strong>{{ feedback_count }}</strong>
+      </div>
+      <div>
+        <span class="label">Mastery records</span>
+        <strong>{{ mastery_count }}</strong>
+      </div>
+      <div>
+        <span class="label">Deferred</span>
+        <strong>{{ deferred_items|length }}</strong>
+      </div>
+      <div>
+        <span class="label">Skipped</span>
+        <strong>{{ skipped_items|length }}</strong>
+      </div>
+    </div>
+
+    {% if evidence_sources %}
+      <h3>Recent evidence</h3>
+      <ul class="compact-list">
+        {% for source in evidence_sources %}
+          <li>{{ source.related_topic }} · {{ source.freshness_level }} · {{ source.source_title }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card" id="syllabus-panel">
+  <form hx-post="/syllabus/generate" hx-target="#syllabus-content" hx-swap="innerHTML" class="section-head">
+    <div>
+      <h2>Roadmap and syllabus</h2>
+      <p class="muted">Grouped curriculum map with freshness, source, confidence, and feedback controls.</p>
+    </div>
+    <input type="hidden" name="reason" value="manual syllabus refresh">
+    <button type="submit">Generate/update syllabus</button>
+  </form>
+  <div id="syllabus-content">
+    {% include "partials/syllabus.html" %}
+  </div>
+</section>
+
+<section class="grid">
+  <div class="card">
+    <h2>Deferred topics</h2>
+    {% if deferred_items %}
+      <ul class="compact-list">
+        {% for item in deferred_items %}
+          <li>{{ item.title }} · {{ item.freshness_level }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No deferred topics yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Skip-for-now topics</h2>
+    {% if skipped_items %}
+      <ul class="compact-list">
+        {% for item in skipped_items %}
+          <li>{{ item.title }} · {{ item.why_this_now }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No skipped topics yet.</p>
+    {% endif %}
+  </div>
+</section>
+
 <section id="result" class="result-area">
   {% include "partials/empty_result.html" %}
 </section>

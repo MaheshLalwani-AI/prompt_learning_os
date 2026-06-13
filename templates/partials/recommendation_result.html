@@ -1,0 +1,45 @@
+<div class="result-card">
+  <div class="section-head">
+    <div>
+      <h3>{{ recommendation.next_topic }}</h3>
+      <p class="muted">{{ recommendation.next_subtopic }}</p>
+    </div>
+    <span class="badge">{{ recommendation.decision }}</span>
+  </div>
+
+  <div class="meta-line">
+    <span>ROI {{ recommendation.roi_score }}</span>
+    <span>Effort {{ recommendation.effort_score }}</span>
+    <span>Urgency {{ recommendation.urgency_score }}</span>
+    <span>Confidence {{ "%.0f"|format(recommendation.confidence * 100) }}%</span>
+    <span>{{ recommendation.freshness_level }}</span>
+  </div>
+
+  <p>{{ recommendation.why_this_now }}</p>
+  <p class="muted">Source: {{ recommendation.source_basis }}</p>
+  <p class="muted">Freshness: {{ recommendation.freshness_note }}</p>
+
+  {% if suggested_steps %}
+    <h4>Next steps</h4>
+    <ul class="compact-list">
+      {% for step in suggested_steps %}
+        <li>{{ step }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if alternatives %}
+    <h4>Alternatives</h4>
+    <p class="muted">{{ alternatives|join(", ") }}</p>
+  {% endif %}
+
+  <div class="actions">
+    {% for action in ["interested", "too_early", "not_useful", "defer", "skip", "already_know"] %}
+      <form hx-post="/feedback" hx-target="#feedback-status" hx-swap="innerHTML">
+        <input type="hidden" name="topic_title" value="{{ recommendation.next_topic }}">
+        <input type="hidden" name="action" value="{{ action }}">
+        <button type="submit">{{ action.replace("_", " ") }}</button>
+      </form>
+    {% endfor %}
+  </div>
+</div>
