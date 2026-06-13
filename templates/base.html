@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title if title else "Prompt Learning OS" }}</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Prompt Learning OS</h1>
+      <p class="muted">A small local system that turns learning goals into optimized prompts.</p>
+    </div>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    function copyPrompt(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.value || el.textContent || "");
+    }
+
+    function startStream(runId, outputId, buttonId) {
+      const output = document.getElementById(outputId);
+      const button = document.getElementById(buttonId);
+      if (!output) return;
+
+      output.textContent = "";
+      if (button) button.disabled = true;
+
+      const source = new EventSource(`/runs/${runId}/stream`);
+
+      source.addEventListener("status", (event) => {
+        output.textContent += event.data + "\n";
+      });
+
+      source.addEventListener("token", (event) => {
+        try {
+          output.textContent += JSON.parse(event.data);
+        } catch {
+          output.textContent += event.data;
+        }
+      });
+
+      source.addEventListener("error", (event) => {
+        output.textContent += "\n[Error] " + event.data + "\n";
+        if (button) button.disabled = false;
+        source.close();
+      });
+
+      source.addEventListener("done", () => {
+        output.textContent += "\n\n[Done]";
+        if (button) button.disabled = false;
+        source.close();
+      });
+    }
+  </script>
+</body>
+</html>

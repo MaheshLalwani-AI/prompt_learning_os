@@ -1,0 +1,39 @@
+<div class="card">
+  <div class="section-head">
+    <div>
+      <h2>{{ package.title }}</h2>
+      <p class="muted">{{ package.next_step }}</p>
+    </div>
+    <div class="actions">
+      <a class="button-link" href="/runs/{{ run.id }}">Open run</a>
+      <button type="button" onclick="copyPrompt('prompt-{{ run.id }}')">Copy prompt</button>
+    </div>
+  </div>
+
+  <div class="meta-line">
+    <span>Template: {{ template.name }}</span>
+    <span>Status: {{ run.response_status }}</span>
+    <span>Input estimate: {{ run.input_token_estimate }} tokens</span>
+    {% if run.model_name %}<span>Model: {{ run.provider_name }} / {{ run.model_name }}</span>{% endif %}
+  </div>
+
+  <textarea id="prompt-{{ run.id }}" class="prompt-box" readonly>{{ package.prompt }}</textarea>
+
+  <div class="actions">
+    <button
+      id="stream-btn-{{ run.id }}"
+      type="button"
+      onclick="startStream({{ run.id }}, 'stream-output-{{ run.id }}', 'stream-btn-{{ run.id }}')"
+    >
+      Stream model response
+    </button>
+  </div>
+
+  <pre id="stream-output-{{ run.id }}" class="stream-box"></pre>
+
+  {% if not llm_enabled %}
+    <p class="warn">
+      API not configured. Use the prompt manually in your chat model.
+    </p>
+  {% endif %}
+</div>

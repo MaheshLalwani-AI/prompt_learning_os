@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="grid">
+  <div class="card">
+    <h2>Profile</h2>
+    <form
+      hx-post="/profile"
+      hx-target="#profile-status"
+      hx-swap="innerHTML"
+      class="form"
+    >
+      <label>Primary goal
+        <input type="text" name="primary_goal" value="{{ profile.primary_goal }}">
+      </label>
+
+      <label>Current level
+        <input type="text" name="current_level" value="{{ profile.current_level }}">
+      </label>
+
+      <label>Learning preferences
+        <textarea name="learning_preferences" rows="4">{{ profile.learning_preferences }}</textarea>
+      </label>
+
+      <div class="row">
+        <label>Optimization mode
+          <select name="optimization_mode">
+            <option value="token_saver" {% if profile.optimization_mode == "token_saver" %}selected{% endif %}>Token saver</option>
+            <option value="balanced" {% if profile.optimization_mode == "balanced" %}selected{% endif %}>Balanced</option>
+            <option value="quality_first" {% if profile.optimization_mode == "quality_first" %}selected{% endif %}>Quality first</option>
+          </select>
+        </label>
+
+        <label>Default mode
+          <select name="default_mode">
+            {% for template in prompt_templates %}
+              <option value="{{ template.slug }}" {% if profile.default_mode == template.slug %}selected{% endif %}>{{ template.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+
+      <button type="submit">Save profile</button>
+    </form>
+    <div id="profile-status" class="status"></div>
+  </div>
+
+  <div class="card">
+    <h2>Generate prompt</h2>
+    <form
+      hx-post="/generate"
+      hx-target="#result"
+      hx-swap="innerHTML"
+      class="form"
+    >
+      <label>Topic
+        <input type="text" name="topic" placeholder="Hermes agent">
+      </label>
+
+      <div class="row">
+        <label>Mode
+          <select name="mode">
+            {% for template in prompt_templates %}
+              <option value="{{ template.slug }}" {% if profile.default_mode == template.slug %}selected{% endif %}>{{ template.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>Time budget
+          <input type="text" name="time_budget" placeholder="10 minutes">
+        </label>
+      </div>
+
+      <label>Goal override
+        <input type="text" name="goal_override" placeholder="Learn Hermes for practical automation">
+      </label>
+
+      <label>Extra context
+        <textarea name="extra_context" rows="4" placeholder="Any constraints, docs, tools, or project context"></textarea>
+      </label>
+
+      <button type="submit">Build optimized prompt</button>
+    </form>
+  </div>
+</section>
+
+<section id="result" class="result-area">
+  {% include "partials/empty_result.html" %}
+</section>
+
+<section class="card">
+  <div class="section-head">
+    <h2>Recent runs</h2>
+    <p class="muted">Stored locally in SQLite.</p>
+  </div>
+
+  {% if runs %}
+    <div class="history">
+      {% for run in runs %}
+        <article class="history-item">
+          <div class="history-top">
+            <strong>{{ run.topic }}</strong>
+            <span class="muted">{{ run.mode }} · {{ run.created_at.strftime("%Y-%m-%d %H:%M") }}</span>
+          </div>
+          <div class="meta-line">
+            <span>{{ run.response_status }}</span>
+            {% if run.model_name %}<span>{{ run.provider_name }} / {{ run.model_name }}</span>{% endif %}
+            {% if run.estimated_cost_usd %}<span>${{ "%.6f"|format(run.estimated_cost_usd) }}</span>{% endif %}
+          </div>
+          <p class="muted">{{ run.next_step }}</p>
+          <a href="/runs/{{ run.id }}">Open</a>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">No runs yet.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>API status</h2>
+  <div class="status-grid">
+    <div>
+      <span class="label">Connection</span>
+      {% if llm_enabled %}
+        <strong class="ok">Configured</strong>
+      {% else %}
+        <strong class="warn">Manual mode</strong>
+      {% endif %}
+    </div>
+    <div>
+      <span class="label">Provider</span>
+      <strong>{{ llm_config.provider_name }}</strong>
+    </div>
+    <div>
+      <span class="label">Model</span>
+      <strong>{{ llm_config.model or "Not set" }}</strong>
+    </div>
+    <div>
+      <span class="label">Estimated spend</span>
+      <strong>${{ "%.6f"|format(cost_total) }}</strong>
+    </div>
+    <div>
+      <span class="label">Tokens</span>
+      <strong>{{ total_input_tokens }} in / {{ total_output_tokens }} out</strong>
+    </div>
+    <div>
+      <span class="label">API calls</span>
+      <strong>{{ api_call_count }}</strong>
+    </div>
+  </div>
+  {% if not llm_enabled %}
+    <p class="warn">LLM API not configured. The app still generates optimized prompts you can paste into ChatGPT, Claude, or DeepSeek.</p>
+  {% endif %}
+</section>
+
+{% endblock %}

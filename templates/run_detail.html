@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="section-head">
+    <div>
+      <h2>{{ run.topic }}</h2>
+      <p class="muted">{{ run.mode }} · {{ run.created_at.strftime("%Y-%m-%d %H:%M") }}</p>
+    </div>
+    <div class="actions">
+      <a class="button-link" href="/">Back</a>
+      <button type="button" onclick="copyPrompt('prompt-detail')">Copy prompt</button>
+    </div>
+  </div>
+
+  <div class="meta-line">
+    <span>Status: {{ run.response_status }}</span>
+    <span>Mode: {{ run.mode }}</span>
+    {% if run.model_name %}<span>Model: {{ run.provider_name }} / {{ run.model_name }}</span>{% endif %}
+    <span>Input: {{ run.input_token_estimate }} tokens</span>
+    <span>Output: {{ run.output_token_estimate }} tokens</span>
+    <span>Cost: ${{ "%.6f"|format(run.estimated_cost_usd) }}</span>
+  </div>
+
+  <textarea id="prompt-detail" class="prompt-box" readonly>{{ run.prompt_text }}</textarea>
+
+  <h3>Next step</h3>
+  <p>{{ run.next_step }}</p>
+
+  <div class="actions">
+    <button
+      id="stream-btn-detail"
+      type="button"
+      onclick="startStream({{ run.id }}, 'stream-output-detail', 'stream-btn-detail')"
+    >
+      Stream model response
+    </button>
+  </div>
+
+  <pre id="stream-output-detail" class="stream-box">{% if run.llm_response %}{{ run.llm_response }}{% endif %}</pre>
+
+  {% if not llm_enabled %}
+    <p class="warn">API not configured. Paste the prompt into your chat model manually.</p>
+  {% endif %}
+</section>
+{% endblock %}
