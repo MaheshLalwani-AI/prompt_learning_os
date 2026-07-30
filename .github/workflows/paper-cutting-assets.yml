@@ -44,6 +44,7 @@ jobs:
           for record in records:
               local_images = []
               for idx, url in enumerate(record.get('images', [])):
+                  url = url.replace('F1_SSC__Priya_13_8_24_', 'F1_SSC_%20Priya_13_8_24_')
                   target = img_dir / f"q{record['number']:03d}_{idx}.png"
                   error = None
                   for attempt in range(4):
