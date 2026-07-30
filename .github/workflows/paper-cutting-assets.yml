@@ -5,6 +5,10 @@ on:
     paths:
       - '.github/workflows/paper-cutting-assets.yml'
       - 'tmp/paper-cutting/**'
+  pull_request:
+    paths:
+      - '.github/workflows/paper-cutting-assets.yml'
+      - 'tmp/paper-cutting/**'
   workflow_dispatch:
 
 jobs:
