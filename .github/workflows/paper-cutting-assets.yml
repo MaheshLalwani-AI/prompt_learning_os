@@ -1,0 +1,75 @@
+name: Paper Cutting Assets
+
+on:
+  push:
+    paths:
+      - '.github/workflows/paper-cutting-assets.yml'
+      - 'tmp/paper-cutting/**'
+  workflow_dispatch:
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check requests pillow
+      - name: Download and normalize images
+        shell: bash
+        run: |
+          python - <<'PY'
+          import glob, io, json, time
+          from pathlib import Path
+          import requests
+          from PIL import Image
+
+          records = []
+          for path in sorted(glob.glob('tmp/paper-cutting/chunk*.json')):
+              with open(path, encoding='utf-8') as f:
+                  records.extend(json.load(f))
+          records.sort(key=lambda r: r['number'])
+          assert len(records) == 70, len(records)
+
+          out = Path('paper-cutting-assets')
+          img_dir = out / 'images'
+          img_dir.mkdir(parents=True, exist_ok=True)
+          session = requests.Session()
+          session.headers.update({'User-Agent': 'Mozilla/5.0'})
+          failures = []
+
+          for record in records:
+              local_images = []
+              for idx, url in enumerate(record.get('images', [])):
+                  target = img_dir / f"q{record['number']:03d}_{idx}.png"
+                  error = None
+                  for attempt in range(4):
+                      try:
+                          response = session.get(url, timeout=45)
+                          response.raise_for_status()
+                          image = Image.open(io.BytesIO(response.content)).convert('RGB')
+                          image.save(target, 'PNG', optimize=True)
+                          local_images.append(str(target.relative_to(out)))
+                          error = None
+                          break
+                      except Exception as exc:
+                          error = f'{type(exc).__name__}: {exc}'
+                          time.sleep(2 * (attempt + 1))
+                  if error:
+                      failures.append({'number': record['number'], 'index': idx, 'url': url, 'error': error})
+              record['local_images'] = local_images
+
+          with open(out / 'records.json', 'w', encoding='utf-8') as f:
+              json.dump(records, f, ensure_ascii=False, indent=2)
+          with open(out / 'failures.json', 'w', encoding='utf-8') as f:
+              json.dump(failures, f, ensure_ascii=False, indent=2)
+          print(f'Records: {len(records)}; downloaded: {sum(len(r["local_images"]) for r in records)}; failures: {len(failures)}')
+          if failures:
+              print(json.dumps(failures, indent=2))
+          PY
+      - name: Upload assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-cutting-assets
+          path: paper-cutting-assets
+          if-no-files-found: error
+          retention-days: 1
